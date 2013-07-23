@@ -6,7 +6,7 @@
 # Runs Puppet parser for syntax check before
 # it pushes code to the remote repo.
 
-# exit status: 0-success, non zero will fail
+# exit status: 0-success, non zero will fail. Errors will be log at /tmp/git_precommit.out"
 
 # per githooks man page (https://www.kernel.org/pub/software/scm/git/docs/githooks.html)
 # pre-commit hook gets called when 'git commit' is done on a local repo 
@@ -14,7 +14,6 @@
 
 error_msg = "/tmp/git_precommit.out"
 exit_status = 1
-syntax_errors = 0
 
 # Puppet installed?
 puppet_bin = "/usr/bin/puppet"
