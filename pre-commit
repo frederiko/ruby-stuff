@@ -1,0 +1,64 @@
+#!/usr/bin/env ruby
+
+# Frederiko Costa: fcosta@boku.com
+# Date: 07/22/2013
+
+# Runs Puppet parser for syntax check before
+# it pushes code to the remote repo.
+
+# exit status: 0-success, non zero will fail
+
+# per githooks man page (https://www.kernel.org/pub/software/scm/git/docs/githooks.html)
+# pre-commit hook gets called when 'git commit' is done on a local repo 
+# requires puppet agent running in the client
+
+error_msg = "/tmp/git_precommit.out"
+exit_status = 1
+syntax_errors = 0
+
+# Puppet installed?
+puppet_bin = "/usr/bin/puppet"
+if not File.exist?(puppet_bin)
+	puts "Cannot find #{puppet_bin}."
+	exit 1
+end
+
+# validate .pp files
+if system("git rev-parse --quiet --verify HEAD > /dev/null")
+	against="HEAD"
+else
+	# initial commit: diff against an empty tree object
+	against="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+end
+
+puts "#{against}"
+
+gitdiff=`git diff-index --diff-filter=AM --name-only --cached #{against}`.split("\n")
+
+gitdiff.each do |f|
+
+	next if File.zero?(f) # skip empty files
+
+	exit_status = case
+	  when File.extname(f).downcase.eql?(".pp") then
+	  	`#{puppet_bin} parser validate #{f} > #{error_msg}`
+	  	$?.exitstatus
+	  when  File.extname(f).downcase.eql?(".erb") then
+	  	`git cat-file blob :0:#{f} | erb -P -x -T - | ruby -c 2> #{error_msg} > /dev/null`
+	  	$?.exitstatus
+	end
+
+	# spit the error log file
+	File.open(error_msg).readlines.each { |l| puts "#{l}" } if exit_status != 0
+end if gitdiff.length > 0
+
+# delete error_msg
+if exit_status != 0
+	begin
+		File.delete(error_msg)
+	rescue Exception => e
+		puts "Error deleting #{error_msg}: #{e.message}"
+	end
+end
+
+exit exit_status
